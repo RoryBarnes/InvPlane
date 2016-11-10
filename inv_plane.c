@@ -1,30 +1,35 @@
-/*********************************************************************
- *                                                                   *
- * INV_PLANE.C                                                       *
- *                                                                   *
- * Author: Rory Barnes (rory@astro.washington.edu)                   *
- *                                                                   *
- * To compile: gcc -o invplane inv_plane.c -lm                       *
- *                                                                   *
- * This code tranforms a system in which inclinations and longitudes *
- * of ascending node is measured from an arbitrary reference frame   *
- * into one in which they are measured from the invariable plane.    *
- * The input file  contains N+2 lines, where N is the number of      *
- * orbiters. The first line is N, the second line is the mass of the *
- * central body, and the next N lines contain the orbital parameters *
- * of the orbiters in the format: Mass SemimajorAxis Eccentricity    *
- * Inclination LongitudeAscendingNode ArgumentPericenter             *
- * MeanAnomaly. The units are solar masses, AU, and degrees.         *
- *                                                                   *
- * The user specifies the output format at the command line:         *
- * -a   an ASCII text file                                           *
- * -m   a big.in file for use with MERCURY                           *
- * -h   a .hnb file for use with HNBODY                              *
- *                                                                   *
- * For example, to transform a system with parameters provided in a  *
- * file called system.in into a big.in file for use with MERCURY,    *
- * the command is: invplane -m system.in.
- *********************************************************************/
+/**********************************************************************
+ *                                                                    *
+ * INV_PLANE.C                                                        *
+ *                                                                    *
+ * Author: Rory Barnes (rory@astro.washington.edu)                    *
+ *                                                                    *
+ * To compile: gcc -o invplane inv_plane.c -lm                        *
+ *                                                                    *
+ * This code tranforms a system in which inclinations and longitudes  *
+ * of ascending node is measured from an arbitrary reference frame    *
+ * into one in which they are measured from the invariable plane.     *
+ * The input file  contains N+2 lines, where N is the number of       *
+ * orbiters (don't count the primary!). The first line is N, the      *
+ * second line is the mass of the central body, and the next N lines  *
+ * contain the orbital parameters of the orbiters in the format:      *
+ * Mass SemimajorAxis Eccentricity Inclination LongitudeAscendingNode *
+ * ArgumentPericenter MeanAnomaly. The units are solar masses, AU,    *
+ * and degrees.                                                       *
+ *                                                                    *
+ * The user specifies the output format at the command line:          *
+ * -a   an ASCII text file                                            *
+ * -m   a big.in file for use with MERCURY                            *
+ * -h   a .hnb file for use with HNBODY                               *
+ * -v   report all warnings                                           *
+ *                                                                    *
+ * For example, to transform a system with parameters provided in a   *
+ * file called system.in into a big.in file for use with MERCURY,     *
+ * the command is: invplane -m system.in.                             *
+ *                                                                    *
+ * Thanks to Russell Deitrick and Pramod Gupta for testing.           *
+ *                                                                    *
+ **********************************************************************/
 
 #include <stdio.h>
 #include <math.h>
@@ -41,7 +46,7 @@
 #define MSUN 1.98892e33
 #define AUCM 1.49598e13
 #define BIGG 6.672e-8
-#define EPS 1e-10
+#define EPS 1e-2       // Limit to produce warnings
 
 typedef struct elem_struct
 {
@@ -51,10 +56,10 @@ typedef struct elem_struct
   double lasc;    // Longitude of ascending node
   double aper;    // Arg. of Pericenter
   double mean_an; // Mean Anomaly
-} elem_ptr;
+} ELEMS;
 
 /* Compute orbital elements from Cartesian coordinates */
-void elems(double mu, double *x,double *v,elem_ptr *elem) {
+void elems(double mu, double *x,double *v,ELEMS *elem) {
    double hx,hy,hz,hsq,hxy,h,r,vsq,rdot;
    double sin_lasc,cos_lasc,sin_aperf,cos_aperf,sinf,cosf;
    double a,e,sin_ecc,cos_ecc,arg;
@@ -117,7 +122,7 @@ double distance(double *x)  {
 }
 
 /* Compute Cartesian coordinates from orbital elements */
-void cartes(double *x, double*v, elem_ptr *elem,double mu) {
+void cartes(double *x,double *v,ELEMS *elem,double mu) {
   double a,e,m,cosi,sini,cos_lasc,sin_lasc,cos_aper,sin_aper;
   double es,ec,w,wp,wpp,wppp,ecc,dx,lo,up,next;
   int iter;
@@ -282,20 +287,22 @@ void rotate(double *z,double **x,int np)  {
 
 int main(int argc, char *argv[]) {
   int k,j,np;
-  elem_ptr *p;
+  ELEMS *p;
   double *m,*ms,*mu;
   double **hex,**hev,**bax,**bav;
   double *zprime,*d0,*df,*vmag0,*vmagf,ksq;
   double *dist0,*distf,*phi0,*phif;
-  int c,dobig=0,dohnb=0,doascii=0,quiet=0;  
+  int c,dobig=0,dohnb=0,doascii=0,verbose=0;  
 
   char id[16],outfile[256];
   FILE *ifp,*afp,*mfp,*hfp;
   
   if (argc > 6) {
-      (void) fprintf(stderr,"Usage: %s [-m] [-h] [-a] file\n",argv[0]);
+      (void) fprintf(stderr,"Usage: %s -mhav file\n",argv[0]);
       exit(1);
   }
+  /* This could be done better. The user could supply unknown flag and 
+     nothing happens! */
   for (k=0;k<argc;k++) {
     if (strcmp(argv[k],"-m") == 0) 
       dobig=1;
@@ -303,13 +310,13 @@ int main(int argc, char *argv[]) {
       dohnb=1;
     if (strcmp(argv[k],"-a") == 0)
       doascii=1;
-    if (strcmp(argv[k],"-q") == 0)
-      quiet=1;
+    if (strcmp(argv[k],"-v") == 0)
+      verbose=1;
   }
 
   if (dobig==0 && dohnb==0 && doascii==0) {
-        fprintf(stderr,"Must specify output file type: Mercury (-m), HNBody (-h) or ascii (-a)\n");
-        exit(1);
+    fprintf(stderr,"ERROR: Must specify output file type: Mercury (-m), HNBody (-h) or ascii (-a)\n");
+    exit(1);
   }
 
   ifp=fopen(argv[argc-1],"r");
@@ -323,7 +330,7 @@ int main(int argc, char *argv[]) {
   hev=malloc((np+1)*sizeof(double*));
   bax=malloc((np+1)*sizeof(double*));
   bav=malloc((np+1)*sizeof(double*));
-  p=malloc((np+1)*sizeof(double));
+  p=malloc((np+1)*sizeof(ELEMS));
   vmag0=malloc(np*sizeof(double));
   vmagf=malloc(np*sizeof(double));
   for (k=0;k<=np;k++) {
@@ -331,6 +338,15 @@ int main(int argc, char *argv[]) {
     hev[k]=malloc(3*sizeof(double));
     bax[k]=malloc(3*sizeof(double));
     bav[k]=malloc(3*sizeof(double));
+
+    /* Initialize values. */
+    m[j]=0;
+    p[j].a=0;
+    p[j].e=0;
+    p[j].i=0;
+    p[j].lasc=0;
+    p[j].aper=0;
+    p[j].mean_an=0;
   }
   zprime=malloc(3*sizeof(double));
   d0=malloc(np*sizeof(double));
@@ -342,25 +358,44 @@ int main(int argc, char *argv[]) {
 
   fscanf(ifp,"%lf",&m[0]);
   m[0] *= MSUN;
+
+  /* Should add control to prevent a user from inserting more or less than np
+     planets. */
       
   for (j=1;j<=np;j++) {   
-      /* Read in astrocentric orbital elements */
-      /* Mass in Solar units */
-      fscanf(ifp,"%lf %lf %lf %lf %lf %lf %lf",&m[j],&p[j].a,&p[j].e,&p[j].i,&p[j].lasc,&p[j].aper,&p[j].mean_an);
-      p[j].i *= M_PI/180;
-      p[j].lasc *= M_PI/180;
-      p[j].mean_an *= M_PI/180;
-      p[j].aper *= M_PI/180;
-      p[j].a *= AUCM;
-      m[j] *= MSUN;
-      if (p[j].a <=0) {
-        fprintf(stderr,"ERROR: Semi-major axis of planet %d cannot be negative.\n",j);
-        exit(1);
-      }
-      if (p[j].e <=0) {
-        fprintf(stderr,"ERROR: Eccentricity of planet %d cannot be negative.\n",j);
-        exit(1);
-      }
+    /* Read in astrocentric orbital elements */
+    /* Mass in Solar units */
+    fscanf(ifp,"%lf %lf %lf %lf %lf %lf %lf",&m[j],&p[j].a,&p[j].e,&p[j].i,&p[j].lasc,&p[j].aper,&p[j].mean_an);
+    p[j].i *= M_PI/180;
+    p[j].lasc *= M_PI/180;
+    p[j].mean_an *= M_PI/180;
+    p[j].aper *= M_PI/180;
+    p[j].a *= AUCM;
+    m[j] *= MSUN;
+    if (m[j] <= 0) {
+      fprintf(stderr,"ERROR: Mass of planet %d must be positive.\n",j);
+      exit(1);
+    }
+    if (p[j].a <= 0) {
+      fprintf(stderr,"ERROR: Semi-major axis of planet %d must be positive.\n",j);
+      exit(1);
+    }
+    if (p[j].e < 0) {
+      fprintf(stderr,"ERROR: Eccentricity of planet %d cannot be negative.\n",j);
+      exit(1);
+    }
+    if (p[j].e >= 1) {
+      fprintf(stderr,"ERROR: Eccentricity of planet %d must be less than 1.\n",j);
+      exit(1);
+    }
+    if (p[j].i >= M_PI) {
+      fprintf(stderr,"ERROR: Inclination of planet %d must be less than 180.\n",j);
+      exit(1);
+    }
+    if (p[j].i < 0) {
+      fprintf(stderr,"ERROR: Inclination of planet %d must be positive.\n",j);
+      exit(1);
+    }
   }
 
   ksq=BIGG*m[0];
@@ -410,7 +445,7 @@ int main(int argc, char *argv[]) {
   
   /* Confirm that L is || to z-hat */
   zprime = invariable_plane(bax,bav,np,m);
-  if (zprime[2] != 1 && !quiet) 
+  if (zprime[2] != 1 || verbose) 
     printf("WARNING: zprime[2] = %lf != 1\n",zprime[2]);
 
   /* Convert to Cartesian astrocentric coordinates */
@@ -420,16 +455,16 @@ int main(int argc, char *argv[]) {
   /* Get distances, velocities, and assert */
   for (j=1;j<=np;j++) {
     df[j-1]=distance(hex[j]);
-    if (d0[j-1] != df[j-1] && !quiet) 
+    if (fabs((d0[j-1] - df[j-1])/d0[j-1]) > EPS || verbose) 
       printf("WARNING: d0[%d] = %lf, but df[%d] = %lf\n",j-1,d0[j-1],j-1,df[j-1]);
   }
 
   for (j=1;j<np;j++) {
     distf[j-1]=sqrt(pow((hex[j+1][0]-hex[j][0]),2) + pow((hex[j+1][1]-hex[j][1]),2) + pow((hex[j+1][2]-hex[j][2]),2));
-    if (dist0[j-1] != distf[j-1] && !quiet) 
+    if (fabs((dist0[j-1] - distf[j-1])/dist0[j-1]) > EPS || verbose) 
       printf("WARNING: dist0[%d] = %lf, but distf[%d] = %lf\n",j-1,dist0[j-1],j-1,distf[j-1]);
     vmagf[j-1]=dot(hev[j],hev[j]);
-    if (vmag0[j-1] != vmagf[j-1] && !quiet) 
+    if (fabs((vmag0[j-1] - vmagf[j-1])/vmag0[j-1]) > EPS || verbose) 
       printf("WARNING: vmag0[%d] = %lf, but vmagf[%d] = %lf\n",j-1,vmag0[j-1],j-1,vmagf[j-1]);
     }
     
@@ -440,7 +475,7 @@ int main(int argc, char *argv[]) {
   /* Assert that mutual inclinations are the same */
   for (j=1;j<np;j++) {
     phif[j-1]=acos(cos(p[j].i)*cos(p[j+1].i) + sin(p[j].i)*sin(p[j+1].i)*cos(p[j].lasc - p[j+1].lasc));
-    if (phi0[j-1] != phif[j-1] && !quiet) 
+    if (fabs((phi0[j-1] - phif[j-1])/phi0[j-1]) > EPS || verbose) 
       printf("WARNING: phi0[%d] = %lf, but phif[%d] = %lf\n",j-1,phi0[j-1],j-1,phif[j-1]);
   }
 
@@ -474,9 +509,11 @@ int main(int argc, char *argv[]) {
   if (doascii) {
     sprintf(outfile,"%s.inv",argv[argc-1]);
     afp=fopen(outfile,"w");
+    fprintf(afp,"%d\n",np);
+    fprintf(afp,"%lf\n",m[0]/MSUN);
     for (j=1;j<=np;j++) 
-      fprintf(afp,"%.4lf %.4lf %.4lf %.4lf %.4lf %.4lf\n",p[j].a,p[j].e,p[j].i,p[j].lasc,p[j].aper,p[j].mean_an);
-    if (!quiet) 
+      fprintf(afp,"%.4lf %.4lf %.4lf %.4lf %.4lf %.4lf %.4lf\n",m[j],p[j].a,p[j].e,p[j].i,p[j].lasc,p[j].aper,p[j].mean_an);
+    if (verbose) 
       printf("Wrote %s.\n",outfile);
   }
 
@@ -494,7 +531,7 @@ int main(int argc, char *argv[]) {
       fprintf(mfp," %.5e %.5e %.5e\n",p[j].aper,p[j].lasc,p[j].mean_an);
       fprintf(mfp," 0. 0. 0.\n");
     }
-    if (!quiet) 
+    if (verbose) 
       printf("Wrote big.in.\n");
   }
 
@@ -523,7 +560,7 @@ int main(int argc, char *argv[]) {
     fprintf(hfp,"OutputHeader: True\n");
     fprintf(hfp,"OutputDigits: 8\n");
     fprintf(hfp,"OutputTypes: HWPs\n");
-    if (!quiet) 
+    if (verbose) 
       printf("Wrote %s.\n",outfile);
   }
 
