@@ -22,10 +22,11 @@ The infile  contains N+2 lines with the format
 .. code-block:: bash
 
   NumberOrbiters
+  CentralMass
   Mass SemimajorAxis Eccentricity Inclination LongitudeAscendingNode ArgumentPericenter MeanAnomaly
   ...
   
-where NumberOrbiters is the number of orbiters (don't count the primary!). The next N lines contain the orbital elements of the orbiters in the order shown. The units are solar masses, AU, and degrees.                                                       
+where NumberOrbiters is the number of orbiters (don't count the primary!). The next line is the mass of the primary in solar masses. The next N lines contain the orbital elements of the orbiters in the order shown. The units are solar masses, AU, and degrees.                                                       
                                                                    
 The user specifies the output format at the command line: 
 
