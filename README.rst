@@ -13,6 +13,8 @@ To compile:
                                                                    
 To execute:
 
+.. code-block:: bash
+
   invplane [-amhv] <infile>
 
 The infile  contains N+2 lines with the format
