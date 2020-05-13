@@ -340,13 +340,13 @@ int main(int argc, char *argv[]) {
     bav[k]=malloc(3*sizeof(double));
 
     /* Initialize values. */
-    m[j]=0;
-    p[j].a=0;
-    p[j].e=0;
-    p[j].i=0;
-    p[j].lasc=0;
-    p[j].aper=0;
-    p[j].mean_an=0;
+    m[k]=0;
+    p[k].a=0;
+    p[k].e=0;
+    p[k].i=0;
+    p[k].lasc=0;
+    p[k].aper=0;
+    p[k].mean_an=0;
   }
   zprime=malloc(3*sizeof(double));
   d0=malloc(np*sizeof(double));
