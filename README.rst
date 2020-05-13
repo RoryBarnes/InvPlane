@@ -45,4 +45,4 @@ the command is:
 
   invplane -m system.in.                             
                                                                    
-Thanks to Russell Deitrick and Pramod Gupta for testing.  
+Thanks to Russell Deitrick, Pramod Gupta and Joseph Livesey for testing.  
