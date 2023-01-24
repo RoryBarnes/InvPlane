@@ -319,7 +319,10 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  ifp=fopen(argv[argc-1],"r");
+  if (!(ifp=fopen(argv[argc-1],"r"))) {
+    fprintf(stderr,"ERROR: File %s not found.\n",argv[argc-1]);
+    exit(1);
+  }
 
   fscanf(ifp,"%d",&np);
   /* Initialize arrays */
